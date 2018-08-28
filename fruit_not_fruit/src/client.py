@@ -72,6 +72,7 @@ def predict_image(image):
 if __name__ == "__main__":
     print("Press q to quit...")
     cap = cv2.VideoCapture(0)
+    
     while(True):
         # Capture frame-by-frame
         ret, frame = cap.read()
@@ -79,7 +80,7 @@ if __name__ == "__main__":
         rgb_img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         ## downsample features to 32, 32, 3 for prediction
         #features = cv2.resize(rgb_img, (32,32))
-        features = cv2.resize(rgb_img, (600,400))
+        features = cv2.resize(rgb_img, (160,94))
         
         # Make prediction using fruit model
         prediction = predict_image(features)
