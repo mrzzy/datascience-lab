@@ -37,7 +37,7 @@ def extract_label(path):
 
 # Extract the features vector from the given dataset entry at path
 # Returns a numpy array representing the input featurs
-def extract_feature(path, feature_len=300, sample_rate=16000):
+def extract_feature(path, feature_len=500, sample_rate=16000):
     waveform, sample_rate = librosa.core.load(path)
     features = librosa.feature.melspectrogram(waveform, sr=sample_rate)
     print(features.shape)
