@@ -161,7 +161,6 @@ def build_style_loss(layers):
     for layer_name in STYLE_LAYERS:
         # Extract style and pastiche features from layer
         layer = layers[layer_name]
-        layer = layers[STYLE_LAYERS[0]] 
         style = layer[STYLE_INDEX, :, :, :]
         pastiche = layer[PASTICHE_INDEX, :, :, :]
 
