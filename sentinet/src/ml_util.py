@@ -3,7 +3,7 @@
 # Machine Learning Utilities
 #
 
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
 import random
 import math
@@ -29,7 +29,8 @@ def normalise(features, stats):
     return np.asarray(norm_features)
 
 # Test Train Spliter
-# Randomly Splits input and output data into test and train data in ratio 7:3
+# Splits input and output data into test and train data in ratio the given 
+# ratio
 # input and output length must be the same.
 # Returns (train_ins, train_outs, test_ins, tests_outs)
 def split_test_train(inputs, outputs, ratio=0.7):
@@ -70,3 +71,6 @@ def shuffle(inputs, outputs):
         shuffle_outs[i], shuffle_outs[j] = shuffle_outs[j], shuffle_outs[i] 
     
     return shuffle_ins, shuffle_outs
+
+#TODO: write functions to help with ploting learning curves
+#TODO: add functions for evulation with metrics
