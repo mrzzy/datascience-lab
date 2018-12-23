@@ -17,11 +17,11 @@ from tensorflow.contrib.opt import ScipyOptimizerInterface
 from shutil import rmtree
 
 # Model Settings
-IMAGE_DIM = (256, 256)
+IMAGE_DIM = (64, 64)
 INPUT_SHAPE = (None, IMAGE_DIM[0], IMAGE_DIM[1], 3)
 CONTENT_WEIGHT = 0.025
 STYLE_WEIGHT = 5.0
-TOTAL_VARIATION_WEIGHT = 0.4
+TOTAL_VARIATION_WEIGHT = 1e-4
 
 CONTENT_LAYER = 'block2_conv2'
 STYLE_LAYERS = ['block1_conv2', 'block2_conv2', 'block3_conv3', 'block4_conv3',
@@ -191,7 +191,7 @@ def build_total_variation_loss(pastiche):
     width_variation = K.square(pastiche[:height-1, :width-1, :] - pastiche[:height-1, 1:, :])
 
     # V(y) = sum(V(h) - V(w))
-    total_variation = K.sum(K.pow(height_variation + width_variation, 1.25))
+    total_variation = K.sum(K.abs(width_variation + height_variation))
     
     return TOTAL_VARIATION_WEIGHT * total_variation
 
