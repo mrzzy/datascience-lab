@@ -19,9 +19,9 @@ from shutil import rmtree
 # Model Settings
 IMAGE_DIM = (512, 512)
 INPUT_SHAPE = (None, IMAGE_DIM[0], IMAGE_DIM[1], 3)
-CONTENT_WEIGHT = 0
-STYLE_WEIGHT = 100.0
-TOTAL_VARIATION_WEIGHT = 0
+CONTENT_WEIGHT = 0.025
+STYLE_WEIGHT = 5.0
+TOTAL_VARIATION_WEIGHT = 1e-4
 
 CONTENT_LAYER = 'block2_conv2'
 STYLE_LAYERS = ['block1_conv2', 'block2_conv2', 'block3_conv3', 'block4_conv3',
