@@ -17,7 +17,7 @@ from tensorflow.contrib.opt import ScipyOptimizerInterface
 from shutil import rmtree
 
 # Model Settings
-IMAGE_DIM = (64, 64)
+IMAGE_DIM = (512, 64512)
 INPUT_SHAPE = (None, IMAGE_DIM[0], IMAGE_DIM[1], 3)
 CONTENT_WEIGHT = 0.025
 STYLE_WEIGHT = 5.0
