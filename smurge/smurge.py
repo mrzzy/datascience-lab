@@ -13,7 +13,7 @@ from PIL import Image
 ## Program Paramaeters
 IMAGE_DIM = (512, 512)
 HIDDEN_LAYERS = 8
-HIDDEN_NEURONS = 64
+HIDDEN_NEURONS = 256
 EPOCHS = 20
 
 ## Data Pre Processing
