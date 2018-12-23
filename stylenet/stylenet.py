@@ -20,7 +20,7 @@ from shutil import rmtree
 IMAGE_DIM = (512, 512)
 INPUT_SHAPE = (None, IMAGE_DIM[0], IMAGE_DIM[1], 3)
 CONTENT_WEIGHT = 1
-STYLE_WEIGHT = 1e+5
+STYLE_WEIGHT = 1e+6
 TOTAL_VARIATION_WEIGHT = 0
 
 CONTENT_LAYER = 'block2_conv2'
@@ -172,7 +172,7 @@ def build_style_loss(layers):
         # Ls = sum((Pl - Gl)^2) / (4 * Nl^2 * Ml ^ 2)
         N, M = 3, IMAGE_DIM[0] * IMAGE_DIM[1]
         layer_style_loss = K.sum(K.square(pastiche_gram - style_gram)) / \
-            (4 * N ** 2 * M ** 2)
+            (4 * (N ** 2) * (M ** 2))
 
         style_loss = style_loss + (STYLE_WEIGHT / len(STYLE_LAYERS)) * layer_style_loss
     
