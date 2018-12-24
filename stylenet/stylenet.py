@@ -17,10 +17,11 @@ from tensorflow.contrib.opt import ScipyOptimizerInterface
 from shutil import rmtree
 
 # Model Settings
-IMAGE_DIM = (512, 512)
+IMAGE_DIM = (800, 800)
 INPUT_SHAPE = (None, IMAGE_DIM[0], IMAGE_DIM[1], 3)
-CONTENT_WEIGHT = 1
-STYLE_WEIGHT = 1e+6
+ 
+CONTENT_WEIGHT = 1e-4
+STYLE_WEIGHT = 1
 TOTAL_VARIATION_WEIGHT = 0
 
 CONTENT_LAYER = 'block2_conv2'
