@@ -159,25 +159,26 @@ def build_style_loss(layers):
 
     # Tabulate style loss for all style layers
     style_loss = K.variable(0.0)
-    for layer_name in STYLE_LAYERS:
+    #for layer_name in STYLE_LAYERS:
         # Extract style and pastiche features from layer
-        layer = layers[layer_name]
-        style = layer[STYLE_INDEX, :, :, :]
-        pastiche = layer[PASTICHE_INDEX, :, :, :]
+    #layer = layers[layer_name]
+    layer = layers[STYLE_LAYERS[0]]
+    style = layer[STYLE_INDEX, :, :, :]
+    pastiche = layer[PASTICHE_INDEX, :, :, :]
 
-        # Compute gram matrixes
-        style_gram = compute_gram_mat(style)
-        pastiche_gram = compute_gram_mat(pastiche)
+    # Compute gram matrixes
+    style_gram = compute_gram_mat(style)
+    pastiche_gram = compute_gram_mat(pastiche)
 
-        # Compute style loss for layer
-        # Ls = sum((Pl - Gl)^2) / (4 * Nl^2 * Ml ^ 2)
-        N, M = 3, IMAGE_DIM[0] * IMAGE_DIM[1]
-        layer_style_loss = K.sum(K.square(pastiche_gram - style_gram)) / \
-            (4 * (N ** 2) * (M ** 2))
+    # Compute style loss for layer
+    # Ls = sum((Pl - Gl)^2) / (4 * Nl^2 * Ml ^ 2)
+    N, M = 3, IMAGE_DIM[0] * IMAGE_DIM[1]
+    layer_style_loss = K.sum(K.square(pastiche_gram - style_gram)) / \
+        (4 * (N ** 2) * (M ** 2))
 
-        style_loss = style_loss + (STYLE_WEIGHT / len(STYLE_LAYERS)) * layer_style_loss
-    
-    
+    style_loss = style_loss + (STYLE_WEIGHT / len(STYLE_LAYERS)) * layer_style_loss
+
+
     return style_loss
 
 # Build the computational graph that will find the total variation loss for 
