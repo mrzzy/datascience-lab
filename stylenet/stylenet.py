@@ -81,7 +81,7 @@ def deprocess_image(img_mat):
     # Swap BGR to RGB
     img_mat = img_mat[:, :, ::-1]
 
-    # Subtract mean value
+    # Add mean value
     img_mat[:, :, 0] += 103.939
     img_mat[:, :, 1] += 116.779
     img_mat[:, :, 2] += 123.68
@@ -155,27 +155,27 @@ def compute_gram_mat(tensor):
 # that the images differ more in style.
 def build_style_loss(layers):
     # Tabulate style loss for all style layers
-    loss = K.variable(0.0, name="style_loss")
+    style_loss = K.variable(0.0, name="style_loss")
 
-    def style_loss(style,combination):
-        S=compute_gram_mat(style)
-        C=compute_gram_mat(combination)
-        channels=3
-        size=IMAGE_DIM[0] * IMAGE_DIM[1]
-        st=K.sum(K.square(S - C)) / (4. * (channels ** 2) * (size ** 2))
-        return st
+    for layer_name in STYLE_LAYERS:
+        # Extract style and pastiche features from layer
+        layer = layers[layer_name]
+        style = layer[STYLE_INDEX, :, :, :]
+        pastiche = layer[PASTICHE_INDEX, :, :, :]
 
-    feature_layers = ['block1_conv2', 'block2_conv2',
-                  'block3_conv3', 'block4_conv3',
-                  'block5_conv3']
+        # Compute gram matrixes
+        style_gram = compute_gram_mat(style)
+        pastiche_gram = compute_gram_mat(pastiche)
 
-    for layer_name in feature_layers:
-        layer_features=layers[layer_name]
-        style_features=layer_features[STYLE_INDEX,:,:,:]
-        combination_features=layer_features[PASTICHE_INDEX,:,:,:]
-        sl=style_loss(style_features,combination_features)
-        loss+=(STYLE_WEIGHT/len(feature_layers))*sl
-    return loss
+        # Compute style loss for layer
+        # Ls = sum((Pl - Gl)^2) / (4 * Nl^2 * Ml ^ 2)
+        N, M = 3, IMAGE_DIM[0] * IMAGE_DIM[1]
+        layer_style_loss = K.sum(K.square(pastiche_gram - style_gram)) / \
+            (4 * (N ** 2) * (M ** 2))
+
+        style_loss.assign_add((STYLE_WEIGHT / len(STYLE_LAYERS)) * layer_style_loss)
+    
+    return style_loss
 
 # Build the computational graph that will find the total variation loss for 
 # given pastiche features 
