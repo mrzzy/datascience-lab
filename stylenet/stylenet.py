@@ -148,6 +148,6 @@ for i in range(iterations):
     mat[:, :, 0] += 103.939
     mat[:, :, 1] += 116.779
     mat[:, :, 2] += 123.68
-    mat = np.clip(x, 0, 255).astype('uint8')
+    mat = np.clip(mat, 0, 255).astype('uint8')
     img = Image.fromarray(mat)
     img.save("pastiche/{}.jpg".format(i))
