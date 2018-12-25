@@ -25,7 +25,7 @@ TOTAL_VARIATION_WEIGHT = 0
 
 CONTENT_LAYER = 'block2_conv2'
 STYLE_LAYERS = ['block1_conv1', 'block2_conv1', 'block3_conv1', 'block4_conv1',
-                'block5_conv1'][:1]
+                'block5_conv1']
 
 CONTENT_INDEX = 0
 STYLE_INDEX = 1
