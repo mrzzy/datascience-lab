@@ -51,9 +51,9 @@ model = VGG16(input_tensor=input_tensor, weights='imagenet',
 
 layers = dict([(layer.name, layer.output) for layer in model.layers])
 
-content_weight = 0
+content_weight = 0.025
 style_weight = 5.0
-total_variation_weight = 0
+total_variation_weight = 1.0
 
 loss = backend.variable(0.)
 
@@ -81,7 +81,7 @@ def style_loss(style, combination):
 
 feature_layers = ['block1_conv2', 'block2_conv2',
                   'block3_conv3', 'block4_conv3',
-                  'block5_conv3'][:1]
+                  'block5_conv3']
 for layer_name in feature_layers:
     layer_features = layers[layer_name]
     style_features = layer_features[1, :, :, :]
@@ -144,11 +144,11 @@ for i in range(iterations):
     end_time = time.time()
     print('Iteration %d completed in %ds' % (i, end_time - start_time))
 
-    x = x.reshape((height, width, 3))
-    x = x[:, :, ::-1]
-    x[:, :, 0] += 103.939
-    x[:, :, 1] += 116.779
-    x[:, :, 2] += 123.68
-    x = np.clip(x, 0, 255).astype('uint8')
+    mat = mat.reshape((height, width, 3))
+    mat = mat[:, :, ::-1]
+    mat[:, :, 0] += 103.939
+    mat[:, :, 1] += 116.779
+    mat[:, :, 2] += 123.68
+    mat = np.clip(mat, 0, 255).astype('uint8')
 
-    Image.fromarray(x).save("pastiche/{}.jpg".format(i))
+    Image.fromarray(mat).save("pastiche/{}.jpg".format(i))
