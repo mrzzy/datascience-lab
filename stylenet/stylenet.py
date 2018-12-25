@@ -17,7 +17,7 @@ from shutil import rmtree
 from scipy.optimize import fmin_l_bfgs_b
 
 # Model Settings
-IMAGE_DIM = (256, 256)
+IMAGE_DIM = (512, 512)
 INPUT_SHAPE = (None, IMAGE_DIM[0], IMAGE_DIM[1], 3)
 CONTENT_WEIGHT = 0.05
 STYLE_WEIGHT = 5
