@@ -51,9 +51,9 @@ model = VGG16(input_tensor=input_tensor, weights='imagenet',
 
 layers = dict([(layer.name, layer.output) for layer in model.layers])
 
-content_weight = 0.025
+content_weight = 0
 style_weight = 5.0
-total_variation_weight = 1.0
+total_variation_weight = 0
 
 loss = backend.variable(0.)
 
