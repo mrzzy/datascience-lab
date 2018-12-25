@@ -14,11 +14,11 @@ from scipy.misc import imsave
 height = 512
 width = 512
 
-content_image_path = 'images/hugo.jpg'
+content_image_path = './data/Tuebingen_Neckarfront.jpg'
 content_image = Image.open(content_image_path)
 content_image = content_image.resize((width, height))
 
-style_image_path = 'images/styles/wave.jpg'
+style_image_path = './data/stary_night.jpg'
 style_image = Image.open(style_image_path)
 style_image = style_image.resize((width, height))
 
@@ -151,4 +151,4 @@ for i in range(iterations):
     x[:, :, 2] += 123.68
     x = np.clip(x, 0, 255).astype('uint8')
 
-    Image.fromarray(x).save("pastiche/{}.jpg".format(i))
+Image.fromarray(x)<Paste>
