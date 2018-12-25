@@ -151,4 +151,4 @@ for i in range(iterations):
     x[:, :, 2] += 123.68
     x = np.clip(x, 0, 255).astype('uint8')
 
-Image.fromarray(x)<Paste>
+    Image.fromarray(x).save("pastiche/{}.jpg".format(i))
