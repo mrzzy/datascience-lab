@@ -1,296 +1,153 @@
-#
-# stylenet.py
-# Artistic Style Transfer
-#
-
-import os
-import time
+from __future__ import print_function
 import numpy as np
 import matplotlib.pyplot as plt
-import tensorflow as tf
-
 from PIL import Image
-from keras import backend as K
-from keras.models import Model
+
 from keras.applications.vgg16 import VGG16
-from shutil import rmtree
+from keras.applications.vgg16 import preprocess_input,decode_predictions
+
+from keras import backend
+from keras.models import Model
 from scipy.optimize import fmin_l_bfgs_b
+from scipy.misc import imsave
 
-# Model Settings
-IMAGE_DIM = (256, 256)
-INPUT_SHAPE = (None, IMAGE_DIM[0], IMAGE_DIM[1], 3)
-CONTENT_WEIGHT = 0
-STYLE_WEIGHT = 5
-TOTAL_VARIATION_WEIGHT = 0
+content_image=Image.open('./data/Tuebingen_Neckarfront.jpg')
+content_image=content_image.resize((256,256))
 
-CONTENT_LAYER = 'block2_conv2'
-STYLE_LAYERS = ['block1_conv1', 'block2_conv1', 'block3_conv1', 'block4_conv1',
-                'block5_conv1']
+style_image= Image.open('./data/stary_night.jpg')
+style_image=style_image.resize((256,256))
 
-CONTENT_INDEX = 0
-STYLE_INDEX = 1
-PASTICHE_INDEX = 2
+style_image.size
 
-## Data Pre Processing
-# Crop the given image to a square frame of x by x
-# where x is the length of the shorter side of the image
-def crop_center(image):
-    # Compute new dimentions for image
-    # Crop a centered square from the image
-    target_dim = min(image.size)
-    len_x, len_y = image.size
+content_array=np.asarray(content_image,dtype='float32')
+content_array=np.expand_dims(content_array,axis=0)
 
-    begin_y = (len_y // 2) - (target_dim // 2)
-    end_y  = (len_y // 2) + (target_dim // 2)
-    
-    begin_x = (len_x // 2) - (target_dim // 2)
-    end_x  = (len_x // 2) + (target_dim // 2)
-    
-    # Perform crop for computed dimentions
-    image = image.crop((begin_x, begin_y, end_x, end_y))
-    return image
+style_array=np.asarray(style_image,dtype='float32')
+style_array=np.expand_dims(style_array,axis=0)
 
-# Load the image at path
-# Reshapes the image for use with the stylenet model by converting it to a 
-# IMAGE_DIM square.
-# Returns the reshaped image as np array
-def load_image(path):
-    image = Image.open(path)
-    # Center crop so we can resize without distortion
-    image = crop_center(image)
-    image = image.resize(IMAGE_DIM)
-    return np.array(image, dtype=np.float32)
+content_array[:, :, :, 0] -= 103.939
+content_array[:, :, :, 1] -= 116.779
+content_array[:, :, :, 2] -= 123.68
+content_array=content_array[:, :, :, ::-1]
 
-## Data Preprocessing
-# Preprocesses the image by the given image matrix img_mat
-# swaps the image channels to BGR and subtracts the RGB mean value
-def preprocess_image(img_mat):
-    # Subtract mean value
-    img_mat[:, :, 0] -= 103.939
-    img_mat[:, :, 1] -= 116.779
-    img_mat[:, :, 2] -= 123.68
+style_array[:, :, :, 0] -= 103.939
+style_array[:, :, :, 1] -= 116.779
+style_array[:, :, :, 2] -= 123.68
+style_array=style_array[:, :, :, ::-1]
+style_array.shape
 
-    # Swap RGB to BGR
-    img_mat = img_mat[:, :, ::-1]
-    return img_mat
+height=256
+width=256
+content_image=backend.variable(content_array)
+style_image=backend.variable(style_array)
+combination_image=backend.placeholder((1,height,width,3))
 
-# Reverses the preprocessing done on the given matrix
-# swaps the image channels to RGB and adds the RGB mean value
-def deprocess_image(img_mat):
-    img_mat = np.reshape(img_mat, IMAGE_DIM + (3, ))
-    # Swap BGR to RGB
-    img_mat = img_mat[:, :, ::-1]
+input_tensor=backend.concatenate([content_image,style_image,combination_image],axis=0)
 
-    # Subtract mean value
-    img_mat[:, :, 0] += 103.939
-    img_mat[:, :, 1] += 116.779
-    img_mat[:, :, 2] += 123.68
+model=VGG16(input_tensor=input_tensor,weights='imagenet', include_top=False)
 
-    # Convert to image
-    img_mat = np.clip(img_mat, 0, 255).astype('uint8')
-    image = Image.fromarray(img_mat)
+content_weight = 0.05
+style_weight = 5.0
+total_variation_weight = 1.0
 
-    return image
+layers=dict([(layer.name, layer.output) for layer in model.layers])
 
-# Construct an input tensor for style transfer for given content and style image
-# paths and the pastiche image tensor Additionally, applies data preprocessing 
-# to images
-# Returns 3 by IMAGE_DIM by 3 tensor
-def construct_input(content_path, style_path, pastiche_tensor):
-    # Load images
-    content_img_mat = load_image(content_path)
-    style_img_mat = load_image(style_path)
+loss=backend.variable(0.)
 
-    # Preprocess images
-    content_img_mat = preprocess_image(content_img_mat)
-    style_img_mat = preprocess_image(style_img_mat)
+def content_loss(content, combination):
+    return backend.sum(backend.square(content-combination))
 
-    # Create tensors for the images 
-    content_tensor = K.constant(content_img_mat)
-    style_tensor = K.constant(style_img_mat)
+layer_features=layers['block2_conv2']
+content_image_features=layer_features[0,:,:,:]
+combination_features=layer_features[2,:,:,:]
+loss+=content_weight*content_loss(content_image_features,combination_features)
 
-    # Stack tensors into single input tensor
-    stack = [None] * 3
-    stack[CONTENT_INDEX] = content_tensor
-    stack[STYLE_INDEX] = style_tensor
-    stack[PASTICHE_INDEX] = pastiche_tensor
-    return K.stack(stack)  
+def gram_matrix(x):
+    features=backend.batch_flatten(backend.permute_dimensions(x,(2,0,1)))
+    gram=backend.dot(features, backend.transpose(features))
+    return gram
 
-## Feature extraction 
-# Get a dictionary of the layers and corresponding tensors of the VGG16 NN
-def get_vgg_layers(model):
-    return dict([(layer.name, layer.output) for layer in model.layers])
+def style_loss(style,combination):
+    S=gram_matrix(style)
+    C=gram_matrix(combination)
+    channels=3
+    size=height * width
+    st=backend.sum(backend.square(S - C)) / (4. * (channels ** 2) * (size ** 2))
+    return st
 
-## Loss Functions
-# Builds the computational for that finds the content loss for content and 
-# pasitche features extracted from the given VGG layers
-# Defines how different each image is different for each other, with a higher 
-# content loss meaning larger difference in content
-def build_content_loss(layers):
-    # Extract content and pasitche features from content layer
-    layer = layers[CONTENT_LAYER]
-    content = layer[CONTENT_INDEX, :, :, :]
-    pastiche = layer[PASTICHE_INDEX, :, :, :]
-
-    # Lc = sum((Fc - Fp)^2
-    return CONTENT_WEIGHT * K.sum(K.square(content - pastiche))
-
-
-# Compute the gram matrix for the given tensor
-# Gram matrix computes the correlations between each feature in x
-# Return the computed gram matrix
-def compute_gram_mat(tensor):
-    # Batch Flatten tensor into single vector per batch to compute gram matrix
-    tensor = K.permute_dimensions(tensor, (2, 0, 1))
-    features_mat  = K.batch_flatten(tensor)
-    # Compute gram matrix of features
-    # G = F * F'
-    gram_mat = K.dot(features_mat, K.transpose(features_mat))
-
-    return gram_mat
-
-# Build the computational graph that will find the style loss for the style 
-# and pastiche features extracted from the given VGG layers
-# Defines how images differ in style, a higher style lost meaning 
-# that the images differ more in style.
-def build_style_loss(layers):
-    # Tabulate style loss for all style layers
-    loss = K.variable(0.0, name="style_loss")
-
-    def style_loss(style,combination):
-        S=compute_gram_mat(style)
-        C=compute_gram_mat(combination)
-        channels=3
-        size=IMAGE_DIM[0] * IMAGE_DIM[1]
-        st=K.sum(K.square(S - C)) / (4. * (channels ** 2) * (size ** 2))
-        return st
-
-    feature_layers = ['block1_conv2', 'block2_conv2',
+feature_layers = ['block1_conv2', 'block2_conv2',
                   'block3_conv3', 'block4_conv3',
                   'block5_conv3']
 
-    for layer_name in feature_layers:
-        layer_features=layers[layer_name]
-        style_features=layer_features[STYLE_INDEX,:,:,:]
-        combination_features=layer_features[PASTICHE_INDEX,:,:,:]
-        sl=style_loss(style_features,combination_features)
-        loss+=(STYLE_WEIGHT/len(feature_layers))*sl
-    return loss
+for layer_name in feature_layers:
+    layer_features=layers[layer_name]
+    style_features=layer_features[1,:,:,:]
+    combination_features=layer_features[2,:,:,:]
+    sl=style_loss(style_features,combination_features)
+    loss+=(style_weight/len(feature_layers))*sl
 
-# Build the computational graph that will find the total variation loss for 
-# given pastiche features 
-# This loss regularises the generated image, removing unwanted dnoise
-def build_total_variation_loss(pastiche):
-    height, width = IMAGE_DIM
+def total_variation_loss(x):
+    a=backend.square(x[:,:height-1,:width-1,:]-x[:,1:,:width-1,:])
+    b = backend.square(x[:, :height-1, :width-1, :] - x[:, :height-1, 1:, :])
+    return backend.sum(backend.pow(a + b, 1.25))
+loss += total_variation_weight * total_variation_loss(combination_image)
+
+grads = backend.gradients(loss, combination_image)
+
+outputs=[loss]
+if isinstance(grads, (list, tuple)):
+    outputs += grads
+else:
+    outputs.append(grads)
+f_outputs = backend.function([combination_image], outputs)
+
+def eval_loss_and_grads(x):
+    x = x.reshape((1, height, width, 3))
+    outs = f_outputs([x])
+    loss_value = outs[0]
+    grad_values = outs[1].flatten().astype('float64')
+    return loss_value, grad_values
+
+class Evaluator(object):
+    def __init__(self):
+        self.loss_value=None
+        self.grads_values=None
     
-    # Compute variation for each image axisw
-    height_variation = K.square(pastiche[:height-1, :width-1 :] - pastiche[1:, :width-1, :])
-    width_variation = K.square(pastiche[:height-1, :width-1, :] - pastiche[:height-1, 1:, :])
+    def loss(self, x):
+        assert self.loss_value is None
+        loss_value, grad_values = eval_loss_and_grads(x)
+        self.loss_value = loss_value
+        self.grad_values = grad_values
+        return self.loss_value
 
-    # V(y) = sum(V(h) - V(w))
-    total_variation = K.sum(K.abs(width_variation + height_variation))
-    
-    return TOTAL_VARIATION_WEIGHT * total_variation
+    def grads(self, x):
+        assert self.loss_value is not None
+        grad_values = np.copy(self.grad_values)
+        self.loss_value = None
+        self.grad_values = None
+        return grad_values
 
-# Build the computational graph that will find the  the total loss: a weight 
-# sum of the total varaition, style and content losses. Determines the 
-# optimisation problem in which style transfer is performed in minimising this loss
-def build_loss(input_tensor, layers):
-    # Extract features
-    pastiche = input_tensor[PASTICHE_INDEX, :, :, :]
-    # Compute total loss
-    content_loss = build_content_loss(layers)
-    style_loss = build_style_loss(layers)
-    total_variation_loss = build_total_variation_loss(pastiche)
-    
-    # L = Wc * Lc + Ws * Ls + Wv + Lv
-    loss = content_loss + style_loss + total_variation_loss
+evaluator=Evaluator()
 
-    return loss
+x=np.random.uniform(0,255,(1,height,width,3))-128.0
 
-## Optmisation
-if __name__ == "__main__":
-    rmtree("pastiche", ignore_errors=True)
-    os.mkdir("pastiche")
-    
-    # Setup data tensors
-    # Load images
-    content_img_mat = load_image("./data/Tuebingen_Neckarfront.jpg")
-    style_img_mat = load_image("./data/stary_night.jpg")
+iterations = 10
 
-    # Preprocess images
-    content_img_mat = preprocess_image(content_img_mat)
-    style_img_mat = preprocess_image(style_img_mat)
-
-    # Create tensors for the images 
-    content_tensor = K.constant(content_img_mat)
-    style_tensor = K.constant(style_img_mat)
-    pastiche_tensor = K.placeholder(IMAGE_DIM + (3,))
-
-    # Stack tensors into single input tensor
-    stack = [None] * 3
-    stack[CONTENT_INDEX] = content_tensor
-    stack[STYLE_INDEX] = style_tensor
-    stack[PASTICHE_INDEX] = pastiche_tensor
-    input_tensor = K.stack(stack)  
-
-    # Load VGG16 model for feature extraction
-    vgg_model = VGG16(input_tensor=input_tensor, weights='imagenet',
-                  include_top=False)
-    layers = get_vgg_layers(vgg_model)
-
-    # Compute loss computational graphs
-    loss = K.variable(0.0)
-    loss += build_content_loss(layers)
-    loss += build_style_loss(layers)
-
-    grads = K.gradients(loss, pastiche_tensor)
-    outputs = [ loss ] + grads
-    f_outputs = K.function([pastiche_tensor], outputs)
-
-    def eval_loss_and_grads(x):
-        x = x.reshape(IMAGE_DIM + (3,))
-        outs = f_outputs([x])
-        loss_value = outs[0]
-        grad_values = outs[1].flatten().astype('float64')
-        return loss_value, grad_values
-    
-    class Evaluator(object):
-        def __init__(self):
-            self.loss_value=None
-            self.grads_values=None
-        
-        def loss(self, x):
-            assert self.loss_value is None
-            loss_value, grad_values = eval_loss_and_grads(x)
-            self.loss_value = loss_value
-            self.grad_values = grad_values
-            return self.loss_value
-
-        def grads(self, x):
-            assert self.loss_value is not None
-            grad_values = np.copy(self.grad_values)
-            self.loss_value = None
-            self.grad_values = None
-            return grad_values
-    
-    evaluator = Evaluator()
-    n_iterations = 10
-    x=np.random.uniform(0,255, IMAGE_DIM + (3,))-128.0
-    for i in range(n_iterations):
-        start_time = time.time()
-
-        x, min_val, info = fmin_l_bfgs_b(evaluator.loss, x.flatten(),
+import time
+for i in range(iterations):
+    print('Start of iteration', i)
+    start_time = time.time()
+    x, min_val, info = fmin_l_bfgs_b(evaluator.loss, x.flatten(),
                            fprime=evaluator.grads, maxfun=20)
+    print(min_val)
+    end_time = time.time()
+    print('Iteration %d completed in %ds' % (i, end_time - start_time))
 
-        # Display progress
-        current_loss =  min_val
-        print("loss: ", current_loss)
-        end_time = time.time()
-        print('Iteration %d completed in %ds' % (i, end_time - start_time))
-        
-        pastiche_img = deprocess_image(x)
-        pastiche_img.save("pastiche/{}.jpg".format(i))
-        
-
+x = x.reshape((height, width, 3))
+x = x[:, :, ::-1]
+x[:, :, 0] += 103.939
+x[:, :, 1] += 116.779
+x[:, :, 2] += 123.68
+x = np.clip(x, 0, 255).astype('uint8')
+plt.imshow(x)
 
