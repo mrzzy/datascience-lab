@@ -144,7 +144,7 @@ for i in range(iterations):
     end_time = time.time()
     print('Iteration %d completed in %ds' % (i, end_time - start_time))
 
-    mat = mat.reshape((height, width, 3))
+    mat = x.reshape((height, width, 3))
     mat = mat[:, :, ::-1]
     mat[:, :, 0] += 103.939
     mat[:, :, 1] += 116.779
