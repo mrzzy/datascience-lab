@@ -14,13 +14,15 @@ from keras import backend as K
 from keras.models import Model
 from keras.applications.vgg16 import VGG16
 from shutil import rmtree
+from tensorflow.contrib.opt import ScipyOptimizerInterface 
 from scipy.optimize import fmin_l_bfgs_b
 
 # Model Settings
 IMAGE_DIM = (128, 128)
-INPUT_SHAPE = (None, IMAGE_DIM[0], IMAGE_DIM[1], 3)
+IMAGE_SHAPE = IMAGE_DIM + (3,)
+INPUT_SHAPE = (None,) + IMAGE_SHAPE
 CONTENT_WEIGHT = 0.05
-STYLE_WEIGHT = 5
+STYLE_WEIGHT = 50
 TOTAL_VARIATION_WEIGHT = 1
 
 CONTENT_LAYER = 'block2_conv2'
@@ -78,7 +80,7 @@ def preprocess_image(img_mat):
 # swaps the image channels to RGB and adds the RGB mean value
 def deprocess_image(img_mat):
     img_mat = np.copy(img_mat)
-    img_mat = np.reshape(img_mat, IMAGE_DIM + (3, ))
+    img_mat = np.reshape(img_mat, IMAGE_SHAPE)
     # Swap BGR to RGB
     img_mat = img_mat[:, :, ::-1]
 
@@ -92,30 +94,6 @@ def deprocess_image(img_mat):
     image = Image.fromarray(img_mat)
 
     return image
-
-# Construct an input tensor for style transfer for given content and style image
-# paths and the pastiche image tensor Additionally, applies data preprocessing 
-# to images
-# Returns 3 by IMAGE_DIM by 3 tensor
-def construct_input(content_path, style_path, pastiche_tensor):
-    # Load images
-    content_img_mat = load_image(content_path)
-    style_img_mat = load_image(style_path)
-
-    # Preprocess images
-    content_img_mat = preprocess_image(content_img_mat)
-    style_img_mat = preprocess_image(style_img_mat)
-
-    # Create tensors for the images 
-    content_tensor = K.constant(content_img_mat)
-    style_tensor = K.constant(style_img_mat)
-
-    # Stack tensors into single input tensor
-    stack = [None] * 3
-    stack[CONTENT_INDEX] = content_tensor
-    stack[STYLE_INDEX] = style_tensor
-    stack[PASTICHE_INDEX] = pastiche_tensor
-    return K.stack(stack)  
 
 ## Feature extraction 
 # Get a dictionary of the layers and corresponding tensors of the VGG16 NN
@@ -175,7 +153,8 @@ def build_style_loss(layers):
         layer_style_loss = K.sum(K.square(pastiche_gram - style_gram)) / \
             (4 * (N ** 2) * (M ** 2))
 
-        style_loss = style_loss + ((STYLE_WEIGHT / len(STYLE_LAYERS)) * layer_style_loss)
+        style_loss = style_loss + ((STYLE_WEIGHT / len(STYLE_LAYERS)) * 
+                                   layer_style_loss)
     
     return style_loss
 
@@ -186,30 +165,64 @@ def build_total_variation_loss(pastiche):
     height, width = IMAGE_DIM
     
     # Compute variation for each image axisw
-    height_variation = K.square(pastiche[:height-1, :width-1 :] - pastiche[1:, :width-1, :])
-    width_variation = K.square(pastiche[:height-1, :width-1, :] - pastiche[:height-1, 1:, :])
+    height_variation = K.square(pastiche[:height-1, :width-1 :] - 
+                                pastiche[1:, :width-1, :])
+    width_variation = K.square(pastiche[:height-1, :width-1, :] - 
+                               pastiche[:height-1, 1:, :])
 
     # V(y) = sum(V(h) - V(w))
     total_variation = K.sum(K.abs(width_variation + height_variation))
     
     return TOTAL_VARIATION_WEIGHT * total_variation
 
-# Build the computational graph that will find the  the total loss: a weight 
+# Build the computational graph that will find the the total loss: a weight 
 # sum of the total varaition, style and content losses. Determines the 
 # optimisation problem in which style transfer is performed in minimising this loss
-def build_loss(input_tensor, layers):
-    # Extract features
-    pastiche = input_tensor[PASTICHE_INDEX, :, :, :]
+def build_loss(pastiche_op, layers):
     # Compute total loss
     content_loss = build_content_loss(layers)
     style_loss = build_style_loss(layers)
-    total_variation_loss = build_total_variation_loss(pastiche)
+    total_variation_loss = build_total_variation_loss(pastiche_op)
     
     # L = Wc * Lc + Ws * Ls + Wv + Lv
     loss = content_loss + style_loss + total_variation_loss
 
     return loss
 
+# Defines a style transfer transfusion
+class Transfusion:
+    def __init__(self, pastiche_op, loss_op):
+        self.pastiche = np.random.normal(0 - 128, 255 - 128, IMAGE_SHAPE)
+
+        # Build evaluation function
+        gradients_op = K.gradients(loss_op, pastiche_op)[0]
+        inputs, outputs = [pastiche_op], [loss_op, gradients_op]
+        self.evaluate = K.function(inputs, outputs)
+        
+    
+    # Perform a iteration of style transfer on the pastiche
+    # Returns the current loss and pastiche
+    def transfer(self):
+        pastiche = self.pastiche.ravel()
+        pastiche, loss, info = fmin_l_bfgs_b(self.compute_loss, 
+                                      pastiche,
+                                      fprime=self.compute_gradients,
+                                      maxfun=20)
+        self.pastiche = pastiche.reshape(IMAGE_SHAPE)
+        
+        return loss, self.pastiche
+        
+    # Computes and returns the loss on the current state of the pastiche
+    def compute_loss(self, pastiche):
+        pastiche = np.reshape(pastiche, IMAGE_SHAPE)
+        self.loss, self.gradients = self.evaluate([ pastiche ])
+        return self.loss
+    
+    # Computes and returns the gradients on the current state of the pastiche 
+    def compute_gradients(self, pastiche):
+        gradients = self.gradients.ravel().astype("float64")
+        return gradients
+    
 ## Optmisation
 if __name__ == "__main__":
     rmtree("pastiche", ignore_errors=True)
@@ -223,75 +236,42 @@ if __name__ == "__main__":
     # Preprocess images
     content_img_mat = preprocess_image(content_img_mat)
     style_img_mat = preprocess_image(style_img_mat)
-
+    
     # Create tensors for the images 
-    content_tensor = K.constant(content_img_mat)
-    style_tensor = K.constant(style_img_mat)
-    pastiche_tensor = K.placeholder(IMAGE_DIM + (3,))
+    content_op = K.constant(content_img_mat)
+    style_op = K.constant(style_img_mat)
+    
+    # Create pastiche tensor
+    pastiche_op = K.placeholder(IMAGE_SHAPE, dtype="float32")
 
     # Stack tensors into single input tensor
     stack = [None] * 3
-    stack[CONTENT_INDEX] = content_tensor
-    stack[STYLE_INDEX] = style_tensor
-    stack[PASTICHE_INDEX] = pastiche_tensor
-    input_tensor = K.stack(stack)  
-
+    stack[CONTENT_INDEX] = content_op
+    stack[STYLE_INDEX] = style_op
+    stack[PASTICHE_INDEX] = pastiche_op
+    input_op = K.stack(stack)  
 
     # Load VGG16 model for feature extraction
-    vgg_model = VGG16(input_tensor=input_tensor, weights='imagenet',
+    vgg_model = VGG16(input_tensor=input_op, weights='imagenet',
                   include_top=False)
     layers = get_vgg_layers(vgg_model)
 
-    # Compute loss computational graphs
-    loss = build_loss(input_tensor, layers)
-
-    grads = K.gradients(loss, pastiche_tensor)
-    outputs = [ loss ] + grads
-    f_outputs = K.function([pastiche_tensor], outputs)
-
-    def eval_loss_and_grads(x):
-        x = x.reshape(IMAGE_DIM + (3,))
-        outs = f_outputs([x])
-        loss_value = outs[0]
-        grad_values = outs[1].flatten().astype('float64')
-        return loss_value, grad_values
+    # Build loss computational graph
+    loss_op = build_loss(pastiche_op, layers)
     
-    class Evaluator(object):
-        def __init__(self):
-            self.loss_value=None
-            self.grads_values=None
-        
-        def loss(self, x):
-            assert self.loss_value is None
-            loss_value, grad_values = eval_loss_and_grads(x)
-            self.loss_value = loss_value
-            self.grad_values = grad_values
-            return self.loss_value
+    # Optimise cost to perform style transfer to produce pastiche
+    transfusion = Transfusion(pastiche_op, loss_op)
 
-        def grads(self, x):
-            assert self.loss_value is not None
-            grad_values = np.copy(self.grad_values)
-            self.loss_value = None
-            self.grad_values = None
-            return grad_values
-    
-    evaluator = Evaluator()
     n_iterations = 10
-    x=np.random.uniform(0,255, IMAGE_DIM + (3,))-128.0
     for i in range(n_iterations):
         start_time = time.time()
-
-        x, min_val, info = fmin_l_bfgs_b(evaluator.loss, x.flatten(),
-                           fprime=evaluator.grads, maxfun=20)
+        
+        loss, pastiche = transfusion.transfer()
 
         # Display progress
-        current_loss =  min_val
-        print("loss: ", current_loss)
+        print("loss: ", loss)
         end_time = time.time()
         print('Iteration %d completed in %ds' % (i, end_time - start_time))
         
-        pastiche_img = deprocess_image(x)
+        pastiche_img = deprocess_image(pastiche)
         pastiche_img.save("pastiche/{}.jpg".format(i))
-            
-
-
