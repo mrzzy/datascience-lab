@@ -25,7 +25,7 @@ Change into the right directory with ```cd``` command.
 Create a conda environment
 
 ```
-conda create --name fruit
+conda create --name fruit tensorflow
 ```
 
 When conda asks you to proceed, type ```y```
@@ -37,7 +37,7 @@ conda activate fruit
 
 Install requirements by first changing to ```fruit_not_fruit``` by using the ```cd``` command.
 ```
-pip install requirements.txt
+pip install -r requirements.txt
 ```
 
 If there are any requirement errors when running, you can install the required requirement individually.
