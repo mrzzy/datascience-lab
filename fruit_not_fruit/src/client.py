@@ -89,7 +89,7 @@ if __name__ == "__main__":
         pred_text = "is that fruit i see.." if prediction == FRUIT else "nothing to see here..."
 
         font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(frame, pred_text, (10,500), font, 3, (255,255,255), 2, cv2.LINE_AA)
+        cv2.putText(frame, pred_text, (150,450), font, 1, (255,255,255), 2, cv2.LINE_AA)
 
         # Display the resulting frame
         cv2.imshow('frame', frame)
