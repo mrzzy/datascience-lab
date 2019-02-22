@@ -138,7 +138,11 @@ def plot_losses(loss_maps, map_legends, loss_labels=LOSS_LABELS):
     # Decorate graph with labels to make it more readable 
     plt.xlabel("Losses")
     plt.ylabel("Magnitude")
-    plt.xticks(loss_indexes, loss_names)
+    # augment xticks so that fit and do not overlap 
+    plt.xticks(loss_indexes, loss_names, fontsize=6, rotation=45)
+    plt.margins(0.2)
+    plt.tight_layout()
+
     plt.legend([p[0] for p in bar_plots], map_legends)
 
 if __name__ == "__main__":
