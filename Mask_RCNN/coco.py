@@ -50,12 +50,13 @@ def train_model(dataset_train, dataset_val, config, schedule=DEFAULT_SCHEDULE,
     return model
 
 # Load a model for the given mode, using the given configuration and 
-# weights from the given weights path. The special weight_path 'last'
-# specifies the loading weights from the most recent training checkpoint
-def load_model(mode, config, weights_path="last"):
+# weights from the given weights path.
+# The special weight_path 'last' specifies the loading weights from the 
+# most recent training checkpoint from the given model directory models_dir
+def load_model(mode, config, weights_path="last", models_dir=MODELS_DIR):
     # Create model for inference
     model = modellib.MaskRCNN(mode, config=config,
-                              model_dir=".")
+                              model_dir=models_dir)
 
     # Load pretrained weights into the model
     weights_path = weights_path if weights_path != "last" else model.find_last()
@@ -63,16 +64,17 @@ def load_model(mode, config, weights_path="last"):
     
     return model
     
-# Evalute the model specified by the given model weights_path  using the given 
+# Evalute the model specified by the given model weight path weights_path
 # evaluation dataset, recording metrics such as loss and evalution time
 # Returns evaluation time in seconds and a dictionary of loss names mapping to 
 # evaluated to loss values
 def evaluate_model(eval_dataset, weights_path="last", verbose=1):
     # Load model for evaluation
-    model = load_model("training", InferenceConfig(), weights_path)
+    model = load_model("training", InferenceConfig(), weights_path=weights_path)
 
     # Build generator for evaluation dataset
-    eval_data_generator = modellib.data_generator(eval_dataset, model.config, shuffle=True,
+    eval_data_generator = modellib.data_generator(eval_dataset, model.config, 
+                                                 shuffle=True,
                                                  batch_size=model.config.BATCH_SIZE)
     
     # Evalute model with evaluation images
@@ -140,6 +142,7 @@ def plot_losses(loss_maps, map_legends, loss_labels=LOSS_LABELS):
     plt.legend([p[0] for p in bar_plots], map_legends)
 
 if __name__ == "__main__":
+    # test code with sample balloon dataaset
     from samples.balloon.balloon import BalloonConfig, BalloonDataset
 
     # Custom configuration
@@ -167,6 +170,6 @@ if __name__ == "__main__":
                 schedule=short_schedule)
     
     # Evalute trained model
-    eval_time, loss_map = evaluate_model(train_dataset)
+    eval_time, loss_map = evaluate_model(dataset_val)
     plot_losses([loss_map], ["Control Losses"])
-    plt.show()
+    plt.savefig("losses.png")
