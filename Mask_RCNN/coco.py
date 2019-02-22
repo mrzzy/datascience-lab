@@ -1,40 +1,53 @@
 #
-# eval.py
-# Evaluate a MaskRCNN model losses and prediction time
+# coco.py
+# High level utilities for working with the coco dataset
 #
 
 import os
 import matplotlib.pyplot as plt
 from mrcnn.config import Config
-from samples.balloon.balloon import BalloonConfig, BalloonDataset
 from samples.coco.coco import CocoConfig
 from mrcnn import model as modellib, utils
 from time import time
 
 # Path to store trained models
-MODELS_DIR = os.path.join(".", "logs")
+MODELS_DIR = os.path.join(".", "models")
 
-# Train and return a mo.del for balloon image sUntitledUntitledegmentation
-def train_model(config):
+# Default training schedule
+DEFAULT_SCHEDULE = (
+    ("heads", 30),
+    ("all", 10)
+)
+
+# Train and return a model using the given training and validation datasets for 
+# image segmentation 
+# Training follows the given schedule specifcation specified as a list of 
+# tuples of mapping layers to number of to train those specified layers. 
+# See mrcnn.model.MaskRCNN.train docs for how to specify layers to train.
+# Saves model training checkpoints in the given models directory
+def train_model(dataset_train, dataset_val, config, schedule=DEFAULT_SCHEDULE, 
+                models_dir=MODELS_DIR, verbose=1):
     # Create the model
-    model = modellib.MaskRCNN(mode="training", config=BalloonConfig(),
-                              model_dir=MODELS_DIR)
+    model = modellib.MaskRCNN(mode="training", config=config,
+                              model_dir=models_dir)
 
-    # Load pretrained coco weights into the model
+    # Loiad pretrained coco weights into the model
     #Exclude the last layers because they require a matching
     # number of classes
     model.load_weights('mask_rcnn_coco.h5', by_name=True, exclude=[
         "mrcnn_class_logits", "mrcnn_bbox_fc",
         "mrcnn_bbox", "mrcnn_mask"])
 
-    # Train (Fine tune the head layers) the model for 30 epochs
-    model.train(dataset_train, dataset_val,
-            learning_rate=model.config.LEARNING_RATE,
-            epochs=30,
-            layers='heads')
-
-class InferenceConfig(BalloonConfig):
-    IMAGES_PER_GPU = 1
+    # Train the model based on the training schedule
+    for layer_spec, n_epochs in schedule:
+        if verbose: print("training schedule: training {} for {} epochs".format(layer_spec, n_epochs))
+                        
+        model.train(dataset_train, dataset_val,
+                learning_rate=model.config.LEARNING_RATE,
+                epochs=n_epochs,
+                layers=layer_spec)
+        
+    return model
 
 # Load a model for the given mode, using the given configuration and 
 # weights from the given weights path. The special weight_path 'last'
@@ -125,8 +138,16 @@ def plot_losses(loss_maps, map_legends, loss_labels=LOSS_LABELS):
     plt.ylabel("Magnitude")
     plt.xticks(loss_indexes, loss_names)
     plt.legend([p[0] for p in bar_plots], map_legends)
-    
+
 if __name__ == "__main__":
+    from samples.balloon.balloon import BalloonConfig, BalloonDataset
+
+    # Custom configuration
+    class InferenceConfig(BalloonConfig):
+        IMAGES_PER_GPU = 1
+    class TrainingConfig(BalloonConfig):
+        IMAGES_PER_GPU = 1
+
     # Load dataset
     dataset_path = "datasets/balloon"
     dataset_train = BalloonDataset()
@@ -138,7 +159,12 @@ if __name__ == "__main__":
     dataset_val.prepare()
     
     # Train model
-    train_model(BalloonConfig())
+    short_schedule = (
+        ("heads", 1),
+    )
+    train_model(dataset_train, dataset_val,
+                config=TrainingConfig(), 
+                schedule=short_schedule)
     
     # Evalute trained model
     eval_time, loss_map = evaluate_model(train_dataset)
