@@ -1,17 +1,19 @@
 #
-# coco.py
-# High level utilities for working with the coco dataset
+# utils.py
+# High level utilities for working with MaskRCNN
 #
 
 import os
+import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import cm
 from mrcnn.config import Config
 from samples.coco.coco import CocoConfig
 from mrcnn import model as modellib, utils
 from time import time
 
-# Path to store trained models
-MODELS_DIR = os.path.join(".", "models")
+# Tensorboard log directory
+LOGS_DIR = os.path.join(".", "logs")
 
 # Default training schedule
 DEFAULT_SCHEDULE = (
@@ -24,12 +26,12 @@ DEFAULT_SCHEDULE = (
 # Training follows the given schedule specifcation specified as a list of 
 # tuples of mapping layers to number of to train those specified layers. 
 # See mrcnn.model.MaskRCNN.train docs for how to specify layers to train.
-# Saves model training checkpoints in the given models directory
+# Logs tensorboard infomation in the given logs_dir
 def train_model(dataset_train, dataset_val, config, schedule=DEFAULT_SCHEDULE, 
-                models_dir=MODELS_DIR, verbose=1):
+                logs_dir=LOGS_DIR, verbose=1):
     # Create the model
     model = modellib.MaskRCNN(mode="training", config=config,
-                              model_dir=models_dir)
+                              model_dir=logs_dir)
 
     # Loiad pretrained coco weights into the model
     #Exclude the last layers because they require a matching
@@ -52,11 +54,11 @@ def train_model(dataset_train, dataset_val, config, schedule=DEFAULT_SCHEDULE,
 # Load a model for the given mode, using the given configuration and 
 # weights from the given weights path.
 # The special weight_path 'last' specifies the loading weights from the 
-# most recent training checkpoint from the given model directory models_dir
-def load_model(mode, config, weights_path="last", models_dir=MODELS_DIR):
+# most recent Tensorboard training checkpoint from the given logs directory
+def load_model(mode, config, weights_path="last", logs_dir=LOGS_DIR):
     # Create model for inference
     model = modellib.MaskRCNN(mode, config=config,
-                              model_dir=models_dir)
+                              model_dir=logs_dir)
 
     # Load pretrained weights into the model
     weights_path = weights_path if weights_path != "last" else model.find_last()
@@ -103,8 +105,8 @@ def evaluate_model(eval_dataset, weights_path="last", verbose=1):
 
 # Plot the given list of loss maps as bar graph by exacting losses specified in
 # the keys of loss_labels dict. When plotting, will label the loss with the the 
-# value of loss_labels dict. Each loss_map will be given the correponding legend
-# in map_legends.
+# key of loss_labels dict. Each loss_map will be given the correponding legend
+# in map_legends and have its losses plotted in different colors
 # Plotting is done in sequence, so plots from later loss_maps will overlap the
 # ones plotted before.
 LOSS_LABELS = {
@@ -128,11 +130,16 @@ def plot_losses(loss_maps, map_legends, loss_labels=LOSS_LABELS):
 
     # Plot each loss map as a bar graph
     bar_plots = []
-    for loss_map in loss_maps:
+    # Setup colors 
+    cmap = plt.get_cmap("magma")
+    colors = cmap(np.linspace(0, 1, len(loss_maps)))
+    
+    for i, loss_map in enumerate(loss_maps):
         # Extract loss values from loss map
         loss_vals = [ loss_map[k] for k in loss_keys ]
         # Plot loss values as bar graph
-        plot = plt.bar(loss_indexes, loss_vals)
+        
+        plot = plt.bar(loss_indexes, loss_vals, color)
         bar_plots.append(plot)
         
     # Decorate graph with labels to make it more readable 
@@ -166,14 +173,16 @@ if __name__ == "__main__":
     dataset_val.prepare()
     
     # Train model
-    short_schedule = (
-        ("heads", 1),
-    )
-    train_model(dataset_train, dataset_val,
-                config=TrainingConfig(), 
-                schedule=short_schedule)
+    #short_schedule = (
+    #    ("heads", 1),
+    #)
+    #train_model(dataset_train, dataset_val,
+    #           config=TrainingConfig(), 
+    #           schedule=short_schedule)
     
     # Evalute trained model
     eval_time, loss_map = evaluate_model(dataset_val)
     plot_losses([loss_map], ["Control Losses"])
+    plot_losses([loss_map], ["Other Losses"])
+    plot_losses([loss_map], ["Yet more losses Losses"])
     plt.savefig("losses.png")
