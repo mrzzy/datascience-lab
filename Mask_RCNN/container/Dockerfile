@@ -37,10 +37,14 @@ RUN cd /tmp && git clone https://github.com/pdollar/coco.git \
 #    -O ./mask_rcnn_coco.h5
 COPY mask_rcnn_coco.h5 /mask_rcnn_test/
 
+# Setup Dependency: mrcnn
+COPY setup.py /mask_rcnn_test/
+COPY samples /mask_rcnn_test/samples
+COPY mrcnn /mask_rcnn_test/mrcnn
+RUN python3 setup.py install
+
 # Copy project files
 COPY datasets /mask_rcnn_test/datasets
-COPY mrcnn /mask_rcnn_test/mrcnn
-COPY samples /mask_rcnn_test/samples
-COPY setup.py eval.py /mask_rcnn_test/
+COPY utils.py /mask_rcnn_test/
 
 CMD bash

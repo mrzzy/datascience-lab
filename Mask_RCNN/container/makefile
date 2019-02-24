@@ -4,7 +4,7 @@
 # 
 
 DOCKER_USERNAME:=mrzzy
-CONTAINER_TAG:=mrcnn
+CONTAINER_TAG:=mrcnn-test
 PORT_MAPS:=6006:6006 8008:8008
 
 # Targets
