@@ -139,7 +139,7 @@ def plot_losses(loss_maps, map_legends, loss_labels=LOSS_LABELS):
         loss_vals = [ loss_map[k] for k in loss_keys ]
         # Plot loss values as bar graph
         
-        plot = plt.bar(loss_indexes, loss_vals, color)
+        plot = plt.bar(loss_indexes, loss_vals, color=colors[i])
         bar_plots.append(plot)
         
     # Decorate graph with labels to make it more readable 
@@ -173,16 +173,15 @@ if __name__ == "__main__":
     dataset_val.prepare()
     
     # Train model
-    #short_schedule = (
-    #    ("heads", 1),
-    #)
-    #train_model(dataset_train, dataset_val,
-    #           config=TrainingConfig(), 
-    #           schedule=short_schedule)
+    short_schedule = (
+        ("heads", 1),
+    )
+    train_model(dataset_train, dataset_val,
+               config=TrainingConfig(), 
+               schedule=short_schedule)
+
     
     # Evalute trained model
     eval_time, loss_map = evaluate_model(dataset_val)
     plot_losses([loss_map], ["Control Losses"])
-    plot_losses([loss_map], ["Other Losses"])
-    plot_losses([loss_map], ["Yet more losses Losses"])
     plt.savefig("losses.png")
