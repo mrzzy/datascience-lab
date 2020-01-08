@@ -2,3 +2,36 @@ data/
 __pycache__/
 *.pyc
 tags
+models/
+*.h5
+*.pickle
+*.npz
+
+# Created by https://www.gitignore.io/api/jupyternotebooks
+# Edit at https://www.gitignore.io/?templates=jupyternotebooks
+
+### JupyterNotebooks ###
+# gitignore template for Jupyter Notebooks
+# website: http://jupyter.org/
+
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Remove previous ipynb_checkpoints
+#   git rm -r .ipynb_checkpoints/
+
+# End of https://www.gitignore.io/api/jupyternotebooks
+
+# lock files
+*.lock
+*.dirlock
+
+## feather files
+*.feather
+
+## scikit-learn joblib models
+*.joblib
